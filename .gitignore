@@ -1,0 +1,23 @@
+# Environment and secrets
+.env
+.venv/
+venv/
+env/
+myenv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local uploads / temp files
+data/uploads/
+*.log
