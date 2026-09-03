@@ -14,7 +14,7 @@ env:
   ACR_LOGIN_SERVER: ekaextractoracr.azurecr.io
   IMAGE_NAME: ai-document-extractor
   RESOURCE_GROUP: rg-ai-extractor
-  CONTAINER_APP_NAME: eka-container-env
+  CONTAINER_APP_NAME: ai-document-extractor
 
 jobs:
   build-and-deploy:
