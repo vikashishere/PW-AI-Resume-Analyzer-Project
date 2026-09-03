@@ -54,7 +54,7 @@ def health_check():
         {"status": "ok"}
     """
     # return {"status": "ok"}
-    return {"status": "ok", "version": "v1"}
+    return {"status": "ok", "version": "v2"}
 
 
 @app.post("/extract", response_model=ExtractionResponse)
