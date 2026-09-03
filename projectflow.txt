@@ -15,6 +15,14 @@
 - Then re-run step7
 
 9. Push project to github
+-----
+git init
+git add .
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/vikashishere/IIT-Patna-Azure-CICD-Project.git
+git push -u origin main
+-----
 
 10. Azure Step 1 — Create Azure Resource Group
     - Open Azure Portal.
