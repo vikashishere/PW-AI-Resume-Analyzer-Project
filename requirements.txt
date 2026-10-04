@@ -1,12 +1,5 @@
-fastapi
-uvicorn
 streamlit
 openai
 python-dotenv
-pydantic
 pypdf
 python-docx
-python-multipart
-requests
-httpx
-pytest

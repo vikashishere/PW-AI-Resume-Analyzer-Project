@@ -1,174 +1,192 @@
-# AI Document Information Extractor
+# AI Resume Analyzer
 
-A beginner-friendly GenAI application that extracts structured information from pasted text, PDF files, Word documents (`.docx`), and images (`.png`, `.jpg`, `.jpeg`).
+A beginner-friendly GenAI project. Upload a resume, paste a Job Description, and get a
+written analysis of how well the two match.
 
-The application uses **OpenAI** for information extraction and demonstrates the journey from local GenAI development to **Docker, Azure deployment, and GitHub Actions CI/CD**.
-
-> **Important:** The Streamlit UI runs locally. The FastAPI backend is the component deployed to Azure Container Apps.
-
----
-
-## 1. What This Project Does
-
-The application allows a user to provide document information in two ways:
-
-1. Enter or paste text
-2. Upload a document/image
-
-The application then:
-
-1. Sends the input from Streamlit to FastAPI.
-2. FastAPI prepares the document content.
-3. The extraction logic creates a prompt based on a fixed internal schema.
-4. FastAPI sends the request to the OpenAI API.
-5. OpenAI extracts the requested information.
-6. FastAPI returns structured JSON.
-7. Streamlit displays the extracted information and quality summary.
-
-The user does **not** define the extraction schema. The schema is predefined inside the application.
+This is Project 2 in the learning path. Project 1 was a CLI chatbot with a single LLM
+call. This project adds file handling, a Streamlit user interface, and a **two-step LLM
+workflow**.
 
 ---
 
-## 2. High-Level Architecture
+## 1. What are we building?
 
-```text
-                         LOCAL MACHINE
-┌──────────────────────────────────────────────────────────────┐
-│                                                              │
-│   User                                                       │
-│    │                                                         │
-│    │ Enter text OR upload PDF/DOCX/Image                    │
-│    ▼                                                         │
-│  Streamlit UI                                                │
-│  localhost:8501                                              │
-│    │                                                         │
-│    │ HTTP request                                            │
-│    ▼                                                         │
-│  FastAPI Backend                                              │
-│  localhost:8000                                              │
-│    │                                                         │
-│    │ Process document + build prompt                         │
-│    ▼                                                         │
-│  OpenAI API                                                   │
-│    │                                                         │
-│    │ Structured information                                  │
-│    ▼                                                         │
-│  FastAPI                                                     │
-│    │                                                         │
-│    │ JSON response                                           │
-│    ▼                                                         │
-│  Streamlit UI                                                 │
-│    │                                                         │
-│    ▼                                                         │
-│  User sees extracted information                              │
-│                                                              │
-└──────────────────────────────────────────────────────────────┘
-```
+A single-page web app.
+
+You upload your resume as a PDF or a Word document, paste the Job Description of a role
+you are interested in, and click **Analyze Resume**. The app reads your resume, sends it
+to OpenAI together with the Job Description, and shows you:
+
+- what your resume already matches well,
+- what looks missing or weak,
+- what you could change to line up better with the role,
+- a short overall summary.
+
+You can then download the whole thing as a Markdown file.
+
+The interesting part is not the app itself, it is the **workflow**. The app does not ask
+the LLM one big question. It asks two smaller questions, and the answer to the first one
+becomes the input to the second one. That pattern is called **prompt chaining**, and it is
+the foundation of almost every real GenAI application.
+
+Everything lives in one file, `app.py`, so you can read the whole program from top to
+bottom.
 
 ---
 
-## 3. Local Application Components
+## 2. What will I learn?
 
-### Streamlit
-
-The Streamlit application is the user-facing UI.
-
-It allows users to:
-
-- Enter/paste text
-- Upload supported documents
-- Start extraction
-- View extracted fields
-- View extraction quality
-- Download the resulting JSON
-
-Local URL:
-
-```text
-http://localhost:8501
-```
-
-### FastAPI
-
-FastAPI acts as the backend API.
-
-Important endpoints:
-
-```text
-GET  /health
-GET  /docs
-POST /extract
-```
-
-Local URL:
-
-```text
-http://localhost:8000
-```
-
-Interactive API documentation:
-
-```text
-http://localhost:8000/docs
-```
-
-### OpenAI
-
-OpenAI is used by the backend to understand the input and extract the requested information according to the predefined schema.
+- **Streamlit basics** — how to build a web page with `st.title`, `st.text_area`,
+  `st.button` and `st.markdown`, without writing any HTML, CSS or JavaScript.
+- **File upload** — how `st.file_uploader` gives you an uploaded file in Python, and how
+  to restrict which file types are allowed.
+- **PDF and DOCX text extraction** — how to pull plain text out of a PDF with `pypdf` and
+  out of a Word document with `python-docx`.
+- **Calling an LLM** — how to use the official OpenAI Python SDK with an API key that is
+  loaded from a `.env` file instead of being typed into your code.
+- **Structured output** — how to ask a model to reply with JSON instead of prose, so that
+  your Python code can actually work with the answer.
+- **A multi-step LLM workflow** — how to split one hard task into two easier steps.
+- **Prompt chaining** — how to feed the output of one LLM call into the next one.
+- **Generating a downloadable report** — how to build a Markdown string in Python and
+  hand it to the user with `st.download_button`.
 
 ---
 
-## 4. Project Structure
+## 3. Project workflow
 
 ```text
-.
-├── app.py                     # Streamlit frontend
-├── api.py                     # FastAPI backend
-├── extractor.py               # OpenAI structured extraction
-├── document_utils.py          # PDF / DOCX / image helpers
-├── config.py                  # Environment/settings configuration
-├── requirements.txt
-├── .env.example
-├── .gitignore
-├── Dockerfile
-├── .dockerignore
-├── README.md
-├── .github/
-│   └── workflows/
-│       └── azure-deploy.yml   # GitHub Actions CI/CD workflow
-├── data/
-└── tests/
-    └── test_api.py
+Resume + JD
+    ↓
+Text Extraction
+    ↓
+LLM Call #1
+    ↓
+Structured Data
+    ↓
+LLM Call #2
+    ↓
+Final Report
 ```
+
+### Step 1 — Text extraction
+
+`extract_resume_text()` looks at the uploaded file name. If it ends in `.pdf` it uses
+`pypdf` to read every page; if it ends in `.docx` it uses `python-docx` to read every
+paragraph. Either way the function returns one plain Python string.
+
+An LLM cannot read a PDF file directly, so this step has nothing to do with AI. It is
+ordinary file handling, and it is the step beginners usually underestimate.
+
+### Step 2 — LLM call #1: structure the information
+
+`analyze_resume()` sends the resume text and the Job Description to OpenAI and asks for
+**JSON only**, with a fixed set of keys:
+
+```json
+{
+  "candidate_skills": [],
+  "candidate_experience": [],
+  "candidate_qualifications": [],
+  "required_skills": [],
+  "preferred_skills": [],
+  "matching_skills": [],
+  "missing_skills": [],
+  "gaps": []
+}
+```
+
+This is the key idea of the whole project:
+
+> The first LLM call converts unstructured resume and JD text into structured information.
+
+Two long, messy documents go in. A small, tidy Python dictionary comes out. `json.loads()`
+turns the model's reply into that dictionary.
+
+The prompt also tells the model not to invent anything. It may only use skills, employers
+and qualifications that actually appear in the text it was given.
+
+### Step 3 — LLM call #2: write the report
+
+`generate_final_report()` does **not** see the resume again. It only sees the JSON from
+Step 2. Its job is to turn that structured data into friendly, readable feedback, again
+returned as JSON with five keys: `strengths`, `gaps`, `missing_or_weak_skills`,
+`improvement_suggestions` and `overall_summary`.
+
+Why two calls instead of one? Because each call has a single, narrow job. Step 2 only has
+to find facts; Step 3 only has to explain them. Small, focused prompts are easier to write,
+easier to debug and give steadier results than one giant prompt that tries to do everything.
+
+### Step 4 — Display
+
+`main()` loops over the five sections, shows each one with `st.markdown()`, and offers a
+download button. The JSON from Step 2 is never shown to the user — it is an intermediate
+result that exists only to feed Step 3.
 
 ---
 
-## 5. Local Setup
+## 4. Project structure
 
-### Step 1 — Clone or Copy the Repository
+```text
+ai-resume-analyzer/
+│
+├── app.py             The entire application: UI, text extraction, both LLM calls
+├── .env.example       Template for your secrets. Copy it to .env and fill it in
+├── .gitignore         Tells git to never commit .env, the virtual env or __pycache__/
+├── requirements.txt   The five Python packages this project needs
+├── README.md          This file
+└── data/              Two sample resumes to try the app with
+```
+
+- **`app.py`** — there is deliberately no `utils.py`, `llm.py` or `prompts.py`. Five short
+  functions sit in one file so that you can follow the whole program in one read:
+  `extract_resume_text()`, `analyze_resume()`, `generate_final_report()`,
+  `create_downloadable_report()` and `main()`.
+- **`.env.example`** — a safe file you can commit, because it holds no real key.
+- **`.gitignore`** — the line that matters most is `.env`. It stops you from accidentally
+  publishing your API key.
+- **`requirements.txt`** — `streamlit`, `openai`, `python-dotenv`, `pypdf`, `python-docx`.
+- **`README.md`** — the instructions you are reading.
+- **`data/`** — two made-up resumes so you can try the app before using your own:
+  `sample_resume_data_analyst.pdf` (tests the PDF path) and
+  `sample_resume_backend_developer.docx` (tests the Word path). The app never reads this
+  folder on its own; you upload these files through the browser like any other resume.
+
+---
+
+## 5. Installation
+
+Open a terminal in the `ai-resume-analyzer` folder.
+
+Create a virtual environment, which is a private copy of Python just for this project:
 
 ```bash
-git clone <repository-url>
-cd <project-folder>
+python -m venv .venv
 ```
 
-### Step 2 — Create a Virtual Environment
+Activate it.
 
-#### Windows PowerShell
+**Windows (PowerShell):**
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+.venv\Scripts\Activate.ps1
 ```
 
-#### macOS / Linux
+**Windows (Command Prompt):**
+
+```cmd
+.venv\Scripts\activate.bat
+```
+
+**macOS / Linux:**
 
 ```bash
-python -m venv .venv
 source .venv/bin/activate
 ```
 
-### Step 3 — Install Dependencies
+You will know it worked because your prompt now starts with `(.venv)`.
+
+Then install the packages:
 
 ```bash
 pip install -r requirements.txt
@@ -176,813 +194,154 @@ pip install -r requirements.txt
 
 ---
 
-## 6. Configure Environment Variables
+## 6. Environment setup
 
-Copy `.env.example` to `.env`.
+Your API key is a password. It does not belong in your code.
 
-### Windows
+Copy the template to a real `.env` file.
+
+**Windows (PowerShell):**
 
 ```powershell
 copy .env.example .env
 ```
 
-### macOS / Linux
+**macOS / Linux:**
 
 ```bash
 cp .env.example .env
 ```
 
-Configure:
+Open `.env` and fill it in:
 
-```env
-OPENAI_API_KEY=your_openai_api_key_here
+```text
+OPENAI_API_KEY=sk-your-real-key-here
 OPENAI_MODEL=gpt-4o-mini
-API_BASE_URL=http://127.0.0.1:8000
 ```
 
-> Never commit the real `.env` file to GitHub. The project `.gitignore` should exclude it.
+- `OPENAI_API_KEY` — create one at <https://platform.openai.com/api-keys>.
+- `OPENAI_MODEL` — which model to use. `gpt-4o-mini` is a good, cheap default. If you
+  leave this blank, `app.py` falls back to `gpt-4o-mini` on its own.
+
+`load_dotenv()` in `app.py` reads this file at startup, and `os.getenv()` picks the two
+values out of it. `.env` is listed in `.gitignore`, so it will never be committed.
 
 ---
 
-## 7. Run the Application Locally
-
-The project uses two processes during local development.
-
-### Start FastAPI
-
-Open Terminal 1:
-
-```bash
-uvicorn api:app --reload --port 8000
-```
-
-Test:
-
-```text
-http://localhost:8000/health
-http://localhost:8000/docs
-```
-
-Expected health response:
-
-```json
-{"status":"ok"}
-```
-
-### Start Streamlit
-
-Open Terminal 2:
+## 7. Running the application
 
 ```bash
 streamlit run app.py
 ```
 
-Open:
-
-```text
-http://localhost:8501
-```
+Streamlit prints a local URL, usually <http://localhost:8501>, and normally opens it in
+your browser for you. Press `Ctrl+C` in the terminal to stop the app.
 
 ---
 
-## 8. How to Use the Application
+## 8. How to use the application
 
-Choose either:
-
-- **Paste Text**
-- **Upload File**
-
-Supported files:
-
-- PDF
-- DOCX
-- PNG
-- JPG
-- JPEG
-
-Then click:
-
-```text
-Extract Information
-```
-
-The application sends the request to FastAPI, which processes the input and calls OpenAI.
-
-The extracted information is returned to Streamlit.
-
-### Example Input
-
-```text
-John Doe
-Email: john@example.com
-Phone: +1 555 123 4567
-Address: 123 Main Street, New York
-Date of Birth: 12 March 1995
-Company: ABC Corporation
-```
+1. **Upload your resume.** Click the upload box and pick a `.pdf` or `.docx` file. If you
+   just want to see the app work, use one of the sample resumes in `data/`.
+2. **Paste the Job Description.** Copy the full job posting into the text area.
+3. **Click Analyze Resume.** A spinner appears while the two LLM calls run. Expect a few
+   seconds.
+4. **Review the results.** Five sections appear: Strengths, Gaps, Missing or Weak Skills,
+   Improvement Suggestions and Overall Summary.
+5. **Download the report.** Click **Download Report** to save `resume_analysis.md`. You
+   can open that file in any text editor, or in VS Code for a nicely formatted preview.
 
 ---
 
-## 9. Fixed Extraction Schema
+## 9. Example workflow
 
-The extraction schema is predefined internally. Users do not create their own schema.
+Say your resume mentions Python, SQL, pandas and two years at a retail analytics company,
+and the Job Description asks for Python, SQL, Airflow and AWS.
+
+**LLM call #1** might return something like:
 
 ```json
 {
-  "name": null,
-  "email": null,
-  "phone": null,
-  "address": null,
-  "date": null,
-  "organization": null,
-  "additional_information": null
+  "candidate_skills": ["Python", "SQL", "pandas"],
+  "candidate_experience": ["2 years as a data analyst in retail analytics"],
+  "candidate_qualifications": ["B.Sc. in Statistics"],
+  "required_skills": ["Python", "SQL", "Airflow", "AWS"],
+  "preferred_skills": ["dbt"],
+  "matching_skills": ["Python", "SQL"],
+  "missing_skills": ["Airflow", "AWS"],
+  "gaps": ["No cloud or data pipeline work described in the resume"]
 }
 ```
 
-Rules:
+**LLM call #2** then turns that into readable feedback:
 
-- If information is present → extract it.
-- If information is missing → return `null`.
-- Do not invent missing information.
+> **Strengths**
+> - Python and SQL are both required by the role and both appear in your resume.
+> - Two years of hands-on retail analytics experience is directly relevant.
+>
+> **Missing or Weak Skills**
+> - Airflow was not identified in the provided resume.
+> - AWS was not identified in the provided resume.
+>
+> **Improvement Suggestions**
+> - If you have scheduled or automated any data jobs, describe that work using the
+>   tooling names, as the role asks for Airflow.
 
----
-
-## 10. Extraction Quality
-
-The application provides a simple quality indicator:
-
-```text
-High   → 5 or more fields
-Medium → 3 or 4 fields
-Low    → fewer than 3 fields
-```
-
-The UI also shows information such as:
-
-```text
-Fields Found: 5 / 7
-```
+Notice the wording: *"AWS was not identified in the provided resume"*, not *"the candidate
+does not know AWS"*. The app only knows what is written in the file you uploaded. You may
+well know AWS and simply not have mentioned it. That distinction is a deliberate part of
+the prompt, and it is a habit worth carrying into every GenAI project you build.
 
 ---
 
-## 11. Run Tests
+## 10. Common errors
 
-From the project root:
+**"No OpenAI API key found."**
+You have not created `.env`, or the key line is empty. Copy `.env.example` to `.env`, paste
+your key, and restart the app. Streamlit only reads `.env` when it starts up.
 
-```bash
-pytest -q
-```
+**"Please upload your resume." / "Please paste the Job Description."**
+One of the two inputs is empty. The app checks both before calling OpenAI, so you never
+pay for an incomplete request.
 
-The tests cover areas such as:
+**Unsupported file**
+`st.file_uploader(..., type=["pdf", "docx"])` rejects anything else before your code runs.
+Note that old `.doc` files are not supported — open them in Word and save as `.docx`.
 
-- `/health` endpoint
-- Structured extraction behavior using a mocked OpenAI response
+**"No text could be read from this file."**
+The PDF is almost certainly a scan or a photo, so the page contains an image of text
+rather than text itself. `pypdf` has nothing to extract. This project does not do OCR, so
+export a text-based PDF from Word or Google Docs instead.
 
----
+**"The analysis failed: ..."**
+The message after the colon tells you which problem it is. Common causes: an invalid or
+revoked key, no credit on the account, a model name in `.env` your account cannot access,
+or no internet connection.
 
-## 12. Docker
-
-The Docker image contains the **FastAPI backend**.
-
-The Streamlit application continues to run separately during local development.
-
-### Build
-
-```bash
-docker build -t ai-document-extractor .
-```
-
-### Run
-
-Make sure `.env` exists and contains a valid OpenAI API key.
-
-```bash
-docker run --env-file .env -p 8000:8000 ai-document-extractor
-```
-
-Test:
-
-```text
-http://localhost:8000/health
-http://localhost:8000/docs
-```
-
-Streamlit can still be started separately:
-
-```bash
-streamlit run app.py
-```
-
-> **The Streamlit UI is not deployed to Azure in this project.**
+**`streamlit: command not found`**
+Your virtual environment is not active, or `pip install -r requirements.txt` has not been
+run yet.
 
 ---
 
-# 13. Azure Deployment
-
-The FastAPI backend is deployed to Azure.
-
-```text
-Azure Resource Group
-        │
-        ├── Azure Container Registry
-        │
-        └── Azure Container Apps
-                │
-                └── FastAPI : 8000
-```
-
-Resources used:
-
-```text
-Resource Group:
-rg-ai-extractor
-
-Azure Container Registry:
-ekaextractoracr
-
-ACR Login Server:
-ekaextractoracr.azurecr.io
-
-Azure Container Apps:
-eka-container-env
-
-Region:
-East US
-```
-
----
-
-## 14. Azure Container Registry
-
-Azure Container Registry stores the Docker images used for deployment.
-
-Repository:
-
-```text
-ai-document-extractor
-```
-
-CI/CD image tags use the Git commit SHA:
-
-```text
-ekaextractoracr.azurecr.io/ai-document-extractor:<commit-sha>
-```
-
----
-
-## 15. Azure Container Apps
-
-The FastAPI Docker container is deployed to:
-
-```text
-eka-container-env
-```
-
-The application listens on:
-
-```text
-Port 8000
-```
-
-Ingress accepts traffic from anywhere.
-
-The Container App provides a public HTTPS application URL:
-
-```text
-https://<your-container-app-url>
-```
-
-API endpoints:
-
-```text
-https://<your-container-app-url>/health
-https://<your-container-app-url>/docs
-https://<your-container-app-url>/extract
-```
-
----
-
-## 16. OpenAI API Key in Azure
-
-For the Azure deployment, configure the OpenAI API key as a Container App environment variable.
-
-Navigation:
-
-```text
-Azure Portal
-    ↓
-Container Apps
-    ↓
-eka-container-env
-    ↓
-Application
-    ↓
-Containers
-    ↓
-Environment Variables
-```
-
-Add:
-
-```text
-Name:
-OPENAI_API_KEY
-
-Source:
-Manual Entry
-
-Value:
-<your OpenAI API key>
-```
-
-Do not put the actual key into source code, Dockerfile, or GitHub.
-
----
-
-## 17. Test the Azure API
-
-Open the Azure Container App's Application URL.
-
-Test:
-
-```text
-/health
-```
-
-Then:
-
-```text
-/docs
-```
-
-Use Swagger UI to test:
-
-```text
-POST /extract
-```
-
-Example input:
-
-```text
-John Doe
-Email: john.doe@example.com
-Phone: +1 555-123-4567
-Address: 123 Main Street, New York, NY 10001
-Date of Birth: January 15, 1995
-```
-
-Confirm that the API returns structured information.
-
----
-
-# 18. GitHub Actions CI/CD
-
-The project uses GitHub Actions to automate deployment.
-
-The deployment flow is:
-
-```text
-Developer changes code
-        ↓
-git push
-        ↓
-GitHub
-        ↓
-GitHub Actions
-        ↓
-Azure Login using OIDC
-        ↓
-Build Docker Image
-        ↓
-Push Image to ACR
-        ↓
-Update Azure Container App
-        ↓
-New Container App Revision
-        ↓
-New version becomes live
-```
-
-This means Docker build, ACR push, and Azure deployment do not have to be performed manually for every code change.
-
----
-
-## 19. Azure Managed Identity
-
-A user-assigned managed identity is used by GitHub Actions:
-
-```text
-github-actions-identity
-```
-
-It has the permissions required for CI/CD.
-
-### ACR Permission
-
-```text
-AcrPush
-```
-
-Allows GitHub Actions to push Docker images to ACR.
-
-### Container App Permission
-
-```text
-Container Apps Contributor
-```
-
-Allows GitHub Actions to update the Container App.
-
----
-
-## 20. GitHub / Azure OIDC
-
-GitHub Actions authenticates to Azure using OpenID Connect (OIDC).
-
-This avoids storing an Azure client secret/password in GitHub.
-
-The federated credential is configured for:
-
-```text
-Organization:
-vikashishere
-
-Repository:
-AI-Doc-Extractor-Azure-CICD
-
-Branch:
-main
-```
-
-The federated credential uses GitHub's immutable organization and repository identifiers.
-
----
-
-## 21. GitHub Actions Secrets
-
-The repository contains:
-
-```text
-AZURE_CLIENT_ID
-AZURE_TENANT_ID
-AZURE_SUBSCRIPTION_ID
-```
-
-These are configured under:
-
-```text
-GitHub Repository
-    ↓
-Settings
-    ↓
-Secrets and variables
-    ↓
-Actions
-```
-
-The values are used by the workflow to authenticate to Azure.
-
----
-
-## 22. GitHub Actions Workflow
-
-The CI/CD workflow is stored at:
-
-```text
-.github/workflows/azure-deploy.yml
-```
-
-It:
-
-1. Checks out the repository.
-2. Logs into Azure using OIDC.
-3. Logs into Azure Container Registry.
-4. Builds the Docker image.
-5. Pushes the image to ACR.
-6. Updates Azure Container Apps.
-
-The Docker image is tagged with:
-
-```text
-${{ github.sha }}
-```
-
-This gives every GitHub commit a unique image version.
-
----
-
-## 23. Triggering CI/CD
-
-The workflow runs automatically when code is pushed to:
-
-```text
-main
-```
-
-Example:
-
-```bash
-git add .
-git commit -m "Update application"
-git push origin main
-```
-
-Then open:
-
-```text
-GitHub Repository
-    ↓
-Actions
-```
-
-The workflow should appear as:
-
-```text
-Build and Deploy to Azure
-```
-
-A successful run means:
-
-```text
-Code
- ↓
-GitHub Actions
- ↓
-Docker Build
- ↓
-ACR Push
- ↓
-Azure Container App Update
-```
-
----
-
-## 24. Verify the New Azure Revision
-
-After a successful GitHub Actions run:
-
-```text
-Azure Portal
-    ↓
-Container Apps
-    ↓
-eka-container-env
-    ↓
-Application
-    ↓
-Revisions and replicas
-```
-
-A new revision should appear.
-
-Confirm that:
-
-- The new revision is running.
-- The revision is healthy.
-- Traffic is directed to the new revision.
-
----
-
-## 25. End-to-End CI/CD Demonstration
-
-A simple code change demonstrates the complete CI/CD process.
-
-For example, change `/health` from:
-
-```json
-{"status": "ok"}
-```
-
-to:
-
-```json
-{"status": "ok", "version": "v1"}
-```
-
-Then:
-
-```bash
-git add .
-git commit -m "Update health endpoint"
-git push origin main
-```
-
-Observe:
-
-```text
-Local Code Change
-        ↓
-Git Push
-        ↓
-GitHub
-        ↓
-GitHub Actions Starts
-        ↓
-Docker Image Builds
-        ↓
-Image Pushes to ACR
-        ↓
-Container App Updates
-        ↓
-New Revision Created
-        ↓
-New Revision Receives Traffic
-        ↓
-/health Shows New Version
-```
-
-Finally open:
-
-```text
-https://<your-container-app-url>/health
-```
-
-The response should contain:
-
-```json
-{
-  "status": "ok",
-  "version": "v1"
-}
-```
-
-This demonstrates that no manual Docker build, manual ACR push, or manual Azure deployment was required.
-
----
-
-# 26. Final End-to-End Architecture
-
-```text
-                         USER
-                           │
-                           ▼
-                    Streamlit UI
-                  localhost:8501
-                           │
-                           │ HTTP / JSON
-                           ▼
-                     FastAPI API
-                   localhost:8000
-                           │
-                           ▼
-                      OpenAI API
-                           │
-                           ▼
-                  Structured JSON
-                           │
-                           ▼
-                    Streamlit UI
-
-
-                CI/CD DEPLOYMENT FLOW
-
-Developer
-    │
-    │ git push
-    ▼
-GitHub Repository
-    │
-    ▼
-GitHub Actions
-    │
-    │ OIDC
-    ▼
-Azure Managed Identity
-    │
-    ├──────────────────────┐
-    ▼                      ▼
-Azure Container       Azure Container
-Registry              Apps
-    │                      │
-    │ Docker Image         │ FastAPI :8000
-    └─────────────────────►│
-                           │
-                           ▼
-                       OpenAI API
-```
-
----
-
-# 27. Important Architecture Note
-
-The project has two application components.
-
-### Local
-
-```text
-Streamlit UI
-localhost:8501
-```
-
-### Azure
-
-```text
-FastAPI API
-Port 8000
-```
-
-The Streamlit application is **not deployed to Azure** in this project.
-
-During local development:
-
-```text
-Streamlit → FastAPI → OpenAI
-```
-
-The Azure backend is:
-
-```text
-Client → Azure Container Apps / FastAPI → OpenAI
-```
-
----
-
-# 28. What This Project Demonstrates
-
-### Application Development
-
-- Python
-- Streamlit
-- FastAPI
-- REST API concepts
-- Environment variables
-- API testing
-- pytest
-
-### GenAI
-
-- LLM-powered information extraction
-- Prompt construction
-- Structured output
-- Fixed extraction schema
-- Multimodal document handling
-
-### Docker
-
-- Dockerfile
-- Docker image
-- Docker container
-- Environment variables inside containers
-- Containerized FastAPI application
-
-### Azure
-
-- Resource Groups
-- Azure Container Registry
-- Azure Container Apps
-- Container App revisions
-- Managed Identity
-- Azure RBAC
-
-### CI/CD
-
-- GitHub Actions
-- OIDC authentication
-- GitHub Secrets
-- Automated Docker builds
-- Automated image pushes
-- Automated Azure deployment
-- Automatic revision creation
-
----
-
-# 29. Final Learning Outcome
-
-The most important takeaway is:
-
-```text
-A developer can make a code change locally,
-push the code to GitHub, and have the updated
-FastAPI application automatically built,
-containerized, pushed to Azure Container Registry,
-and deployed to Azure Container Apps.
-```
-
-In short:
-
-```text
-Code
-  ↓
-GitHub
-  ↓
-GitHub Actions
-  ↓
-Docker Build
-  ↓
-Azure Container Registry
-  ↓
-Azure Container Apps
-  ↓
-Live FastAPI Application
-```
-
----
-
-# 30. Notes and Limitations
-
-- PDF support is for text-based PDFs only; OCR is not included.
-- Images are sent to an OpenAI multimodal model.
-- A valid OpenAI API key and internet access are required.
-- The extraction schema is fixed and cannot be customized by the user.
-- The project intentionally keeps the architecture small and beginner-friendly.
-- Streamlit is kept local; only the FastAPI backend is deployed to Azure.
+## 11. What this project does NOT cover
+
+This project is deliberately kept small. It does not use:
+
+- **RAG** (retrieval-augmented generation)
+- **Embeddings**
+- **Vector databases**
+- **Agents**
+- **Tool calling / function calling**
+- **Fine-tuning**
+- **Multi-agent systems**
+- **Persistent memory or a database**
+
+The resume and the Job Description are simply pasted into the prompt, and the flow is
+fixed: two LLM calls, always in the same order. Nothing is stored. Close the browser tab
+and the analysis is gone.
+
+That is the right choice for now. A fixed workflow is predictable, cheap to run and easy to
+debug, and a very large share of real production GenAI features are exactly this: a couple
+of well-written prompts chained together. The topics above solve problems this project does
+not have yet, and they come later in the learning path.
